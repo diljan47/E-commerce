@@ -7,7 +7,7 @@ const cookieParser = require("cookie-parser");
 
 const userRoute = require("./routes/userRoute");
 const productsRoute = require("./routes/productsRoute");
-
+const categoryRoute = require("./routes/categoryRoute");
 const dbConnect = () => {
   try {
     mongoose.connect(process.env.MONGODB_URL);
@@ -22,6 +22,7 @@ app.use(cookieParser());
 
 app.use("/api/user", userRoute);
 app.use("/api/products", productsRoute);
+app.use("/api/category", categoryRoute);
 
 app.listen(PORT, () => {
   console.log(`Server started on PORT ${PORT}`);

@@ -17,8 +17,9 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   const { id } = req.params;
-  validId(id);
   try {
+    validId(id, res);
+
     if (req.body.title) {
       req.body.slug = slugify(req.body.title);
     }
@@ -34,7 +35,7 @@ const updateProduct = async (req, res) => {
 const getaProduct = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const findProduct = await Products.findById(id);
     return res.status(200).json(findProduct);
   } catch (error) {
@@ -45,7 +46,7 @@ const getaProduct = async (req, res) => {
 const deleteaProduct = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const deleteaProduct = await Products.findByIdAndDelete(id);
     res.json(deleteaProduct);
   } catch (error) {
@@ -181,9 +182,22 @@ const ratings = async (req, res) => {
         }
       );
     }
-    console.log(productDetails);
     const updatedRatings = await Products.findById(prodId);
-    res.json(updatedRatings);
+    let ratingsLength = updatedRatings.ratings.length;
+    let ratingsTotal = updatedRatings.ratings
+      .map((rate) => rate.star)
+      .reduce((prev, curr) => prev + curr, 0);
+    let ratingsAverage = Math.round(ratingsTotal / ratingsLength);
+    let updatedProduct = await Products.findByIdAndUpdate(
+      prodId,
+      {
+        totalrating: ratingsAverage,
+      },
+      {
+        new: true,
+      }
+    );
+    res.json(updatedProduct);
   } catch (error) {
     console.log(error);
   }
