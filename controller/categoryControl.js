@@ -49,7 +49,7 @@ const deleteCategory = async (req, res) => {
     const deletedCate = await Category.findByIdAndDelete(id);
     return res
       .status(200)
-      .json({ message: "Category Dleted", data: deletedCate });
+      .json({ message: "Category Deleted", data: deletedCate });
   } catch (error) {
     console.log(error);
   }
