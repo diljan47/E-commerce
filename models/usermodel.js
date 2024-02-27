@@ -25,10 +25,12 @@ const userModel = new mongoose.Schema(
       type: String,
       default: "user",
     },
-    cart: {
-      type: Array,
-      default: [],
-    },
+    cart: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Cart",
+      },
+    ],
     address: {
       type: String,
     },
@@ -48,7 +50,7 @@ const userModel = new mongoose.Schema(
 );
 
 userModel.pre("save", async function (next) {
-  const salt = await bcrypt.genSaltSync(10);
+  const salt = bcrypt.genSaltSync(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });

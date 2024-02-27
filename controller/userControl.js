@@ -11,16 +11,23 @@ const uniqid = require("uniqid");
 
 const createUser = async (req, res) => {
   try {
-    const { email } = req.body;
-    const findUser = await User.findOne({ email });
-    if (!findUser) {
-      const newUser = await User.create(req.body);
-      res.json(newUser);
-    } else {
-      return res.json("User already exists");
+    const { email, mobile } = req.body;
+    const existingUser = await User.findOne({ $or: [{ email }, { mobile }] });
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json("User with this email already exists");
+      }
+      if (existingUser.mobile === mobile) {
+        return res
+          .status(400)
+          .json("User with this mobile number already exists");
+      }
     }
+    const newUser = await User.create(req.body);
+    return res.status(200).json(newUser);
   } catch (error) {
-    console.log(error);
+    console.error(error);
+    return res.status(500).json("Internal Server Error");
   }
 };
 
@@ -28,7 +35,11 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
   try {
     const findUser = await User.findOne({ email });
-    if (findUser && (await findUser.isPassMatch(password))) {
+    if (!findUser) {
+      return res.status(400).json("Email does not Exist");
+    }
+    await findUser.isPassMatch(password);
+    if (findUser && (await findUser.isPassMatch(password.trim()))) {
       const newrefreshToken = await createrefreshToken(findUser?._id);
       const updatedToken = await User.findByIdAndUpdate(
         findUser?._id,
@@ -47,11 +58,10 @@ const loginUser = async (req, res) => {
         email: findUser?.email,
         mobile: findUser?.mobile,
         address: findUser?.address,
-        accesstoken: accessToken(findUser?._id),
-        refreshToken: newrefreshToken,
+        token: accessToken(findUser?._id),
       });
     } else {
-      return res.json("Email or Password Incorrect!!");
+      return res.status(400).json("Email or Password Incorrect!!");
     }
   } catch (error) {
     console.log(error);
@@ -151,7 +161,7 @@ const userAddress = async (req, res) => {
 
 const getallUsers = async (req, res) => {
   try {
-    const allUsers = await User.find();
+    const allUsers = await User.find().populate("cart").exec();
     return res.json(allUsers);
   } catch (error) {
     console.log(error);
@@ -161,7 +171,7 @@ const getallUsers = async (req, res) => {
 const singleUser = async (req, res) => {
   const { id } = req.params;
   try {
-    const userData = await User.findById(id);
+    const userData = await User.findById(id).populate("cart").exec();
     res.json(userData);
   } catch (error) {
     console.log(error.message);
@@ -254,35 +264,23 @@ const adminLogin = async (req, res) => {
 
 //Cart Control
 const userCart = async (req, res) => {
-  const { cart } = req.body;
+  const { productId, color, quantity, price } = req.body;
   const { id } = req.user;
   try {
     validId(id, res);
-    const user = await User.findById(id);
-    const cartExists = await Cart.findOne({ orderby: user?._id });
-    if (cartExists instanceof Cart) {
-      await Cart.deleteOne({ _id: cartExists._id });
-    }
-    const products = await Promise.all(
-      cart.map(async (item) => {
-        const { prodId, count, color } = item;
-        const { price } = await Products.findById(prodId)
-          .select("price")
-          .exec();
-        return { prodId, count, color, price };
-      })
-    );
-    const cartTotal = products.reduce(
-      (total, item) => total + item.price * item.count,
-      0
-    );
-
     let finalCart = await new Cart({
-      cart: products,
-      cartTotal,
-      orderby: user?._id,
+      userId: id,
+      productId,
+      color,
+      price,
+      quantity,
     }).save();
     res.status(200).json(finalCart);
+
+    //
+    const pushToUser = await User.findByIdAndUpdate(id, {
+      $push: { cart: finalCart._id },
+    });
   } catch (error) {
     console.log(error);
   }
@@ -292,11 +290,44 @@ const getUserCart = async (req, res) => {
   const { id } = req.user;
   try {
     validId(id, res);
-    const userCart = await Cart.findOne({ orderby: id });
+    const userCart = await Cart.find({ userId: id })
+      .populate("productId")
+      .populate("color")
+      .exec();
     if (!userCart) {
       return res.status(200).json("Cart Empty");
     }
-    res.status(200).json({ total: userCart.cart.length, userCart });
+    return res.status(200).json(userCart);
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const removeAProductCart = async (req, res) => {
+  const { id } = req.user;
+  try {
+    validId(id, res);
+
+    const result = await Cart.findOneAndDelete({
+      userId: id,
+      productId: req.params?.id,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json("Something went wrong");
+  }
+};
+
+const updateQuantityFromCart = async (req, res) => {
+  const { id } = req.user;
+  const { prodId, newQuantity } = req.body;
+  try {
+    validId(id, res);
+    const userCart = await Cart.findOne({ userId: id, productId: prodId });
+    userCart.quantity = newQuantity;
+    userCart.save();
+    return res.status(200).json(userCart);
   } catch (error) {
     console.log(error);
   }
@@ -307,7 +338,7 @@ const emptyCart = async (req, res) => {
   try {
     validId(id, res);
     const user = await User.findById(id);
-    const userCart = await Cart.findOneAndDelete({ orderby: user._id });
+    const userCart = await Cart.findOneAndDelete({ userId: user._id });
     res.status(200).json(userCart);
   } catch (error) {
     console.log(error);
@@ -319,6 +350,8 @@ const emptyCart = async (req, res) => {
 const createOrder = async (req, res) => {
   const { id } = req.user;
   try {
+    validId(id, res);
+
     const user = await User.findById(id);
     const userCart = await Cart.findOne({ orderby: user._id });
 
@@ -422,6 +455,8 @@ module.exports = {
   refreshTokenhandler,
   userWishlist,
   adminLogin,
+  removeAProductCart,
+  updateQuantityFromCart,
   userCart,
   getUserCart,
   emptyCart,
