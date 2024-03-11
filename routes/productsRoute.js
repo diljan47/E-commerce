@@ -4,7 +4,6 @@ const {
   getaProduct,
   getaAllProducts,
   deleteaProduct,
-  addtoWishList,
   ratings,
 } = require("../controller/productControl");
 const isAdmin = require("../middleware/isAdmin");
@@ -17,7 +16,6 @@ router.post("/create", jwtAuth, upload.array("images", 10), createProduct);
 router.put("/update/:id", jwtAuth, isAdmin, updateProduct);
 router.get("/:id", getaProduct);
 router.get("/", getaAllProducts);
-router.put("/wishlist", jwtAuth, addtoWishList);
 router.put("/ratings", jwtAuth, ratings);
 router.delete("/:id", isAdmin, deleteaProduct);
 

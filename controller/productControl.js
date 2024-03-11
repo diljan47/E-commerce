@@ -1,7 +1,6 @@
 const { default: slugify } = require("slugify");
 const Products = require("../models/productModel");
 const validId = require("../config/mongoIDvalidate");
-const User = require("../models/usermodel");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs").promises;
 
@@ -80,6 +79,7 @@ const deleteaProduct = async (req, res) => {
 const getaAllProducts = async (req, res) => {
   try {
     //Filtering using gt,gte,lt,lte on query
+
     // let query = JSON.stringify(req.query);
     // query = query.replace(/\b(gt|gte|lt|lte)\b/g, (match) => {
     //   return `$${match}`;
@@ -124,68 +124,6 @@ const getaAllProducts = async (req, res) => {
       .json({ length: findAllProducts.length, data: findAllProducts });
   } catch (error) {
     console.log(error);
-  }
-};
-
-// const addtoWishList = async (req, res) => {
-//   const { id } = req.user;
-//   const { prodId } = req.body;
-//   try {
-//     const user = await User.findById(id);
-//     const alreadyAdded = user.wishlist.find((id) => id.toString() === prodId);
-//     console.log(alreadyAdded);
-//     if (alreadyAdded) {
-//       console.log(`Removing ${prodId} from wishlist`);
-//       let updatedUser = await User.findByIdAndUpdate(
-//         id,
-//         {
-//           $pull: { wishlist: prodId },
-//         },
-//         {
-//           new: true,
-//         }
-//       );
-//       console.log("User after removing:", updatedUser);
-//       res.json(updatedUser);
-//     } else {
-//       console.log(`Adding ${prodId} to wishlist`);
-//       let updatedUser = await User.findByIdAndUpdate(
-//         id,
-//         {
-//           $push: { wishlist: prodId },
-//         },
-//         {
-//           new: true,
-//         }
-//       );
-//       console.log("User after adding:", updatedUser);
-//       res.json(updatedUser);
-//     }
-//   } catch (error) {
-//     console.log("Error:", error);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// };
-
-const addtoWishList = async (req, res) => {
-  const { id } = req.user;
-  const { prodId } = req.body;
-
-  try {
-    const user = await User.findById(id);
-    const alreadyAddedIndex = user.wishlist.findIndex(
-      (itemId) => itemId.toString() === prodId
-    );
-    if (alreadyAddedIndex !== -1) {
-      // Remove the old product ID from the wishlist
-      user.wishlist.splice(alreadyAddedIndex, 1);
-    }
-    user.wishlist.push(prodId);
-    const updatedUser = await user.save();
-    res.json(updatedUser);
-  } catch (error) {
-    console.log("Error:", error);
-    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -300,6 +238,5 @@ module.exports = {
   getaProduct,
   getaAllProducts,
   deleteaProduct,
-  addtoWishList,
   ratings,
 };

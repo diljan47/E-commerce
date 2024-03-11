@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 
 const jwtAuth = (req, res, next) => {
   let token;
+  console.log(req?.headers?.authorization);
   if (req?.headers?.authorization?.startsWith("Bearer")) {
     token = req.headers.authorization?.split(" ")[1];
     try {
@@ -11,10 +12,10 @@ const jwtAuth = (req, res, next) => {
         next();
       }
     } catch (error) {
-      return res.status(400).json("Invalid token or expired token");
+      return res.status(401).json("Invalid token or expired token");
     }
   } else {
-    return res.status(400).json("No token present");
+    return res.status(401).json("No token present");
   }
 };
 

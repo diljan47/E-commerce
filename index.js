@@ -12,6 +12,9 @@ const categoryRoute = require("./routes/categoryRoute");
 const colorRoute = require("./routes/colorRoute");
 const brandRoute = require("./routes/brandRoute");
 const bodyParser = require("body-parser");
+const morgan = require("morgan");
+app.use(morgan("dev"));
+
 const dbConnect = () => {
   try {
     mongoose.connect(process.env.MONGODB_URL);
@@ -20,12 +23,19 @@ const dbConnect = () => {
     console.log("Database Error");
   }
 };
+
+const corsOptions = {
+  origin: [process.env.BASE_URL],
+  credentials: true,
+};
 dbConnect();
-app.use(cors());
-app.use(express.json());
 app.use(cookieParser());
+// app.use(cors());
+
+app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use(cors(corsOptions));
 app.use("/api/user", userRoute);
 app.use("/api/products", productsRoute);
 app.use("/api/category", categoryRoute);
