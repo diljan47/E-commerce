@@ -65,7 +65,7 @@ const loginUser = async (req, res) => {
       return res.status(400).json("Email or Password Incorrect!!");
     }
   } catch (error) {
-    console.log(error);
+    res.status(500).json("Internal Server Error");
   }
 };
 
@@ -73,20 +73,31 @@ const loginUser = async (req, res) => {
 
 const refreshTokenhandler = async (req, res) => {
   const cookie = req.cookies;
-  if (!cookie?.refreshToken)
-    return res.status(400).json("No refresh token present in cookies");
+  if (!cookie?.refreshToken) {
+    return res.status(403).json("No refresh token present in cookies");
+  }
   const refreshToken = cookie.refreshToken;
   const user = await User.findOne({ refreshToken });
+  if (!user) {
+    return res
+      .status(403)
+      .json({ error: "No user matched with current cookie" });
+  }
   if (user) {
     jwt.verify(refreshToken, process.env.JWT_TOKEN, (err, decoded) => {
       if (err || user.id !== decoded.id) {
-        return res.status(201).json("No user present in db ");
+        return res.status(403).json("No user present in db ");
       }
       const newaccessToken = accessToken(user?.id);
-      return res.status(200).json({ newaccessToken });
+      return res.status(200).json({
+        newaccessToken,
+        name: user?.name,
+        email: user?.email,
+        mobile: user?.mobile,
+      });
     });
   } else {
-    return res.status(400).json("No user matched with current token");
+    return res.status(403).json({ error: "Something wrong with cookies" });
   }
 };
 
@@ -96,14 +107,14 @@ const logout = async (req, res) => {
   const { refreshToken } = req.cookies;
   try {
     if (!refreshToken) {
-      return res.status(400).json({ error: "No Refresh Token in Cookies" });
+      return res.status(403).json({ error: "No Refresh Token in Cookies" });
     }
 
     const user = await User.findOne({ refreshToken });
 
     if (!user) {
-      res.clearCookie("refreshToken", { httpOnly: true });
-      return res.sendStatus(204);
+      res.clearCookie("refreshToken", { httpOnly: true, secure: true });
+      return res.status(204).json("User Not Found Cookie Cleared!");
     }
 
     await User.findOneAndUpdate(
@@ -137,7 +148,7 @@ const updateUser = async (req, res) => {
     res.json(idMatched);
   } catch (error) {
     console.log(error.message);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json("Internal server error");
   }
 };
 
@@ -156,7 +167,7 @@ const userAddress = async (req, res) => {
     );
     res.json(newAddress);
   } catch (error) {
-    console.log(error.message);
+    res.status(500).json("Internal server error");
   }
 };
 
