@@ -8,6 +8,7 @@ const { createrefreshToken } = require("../config/refreshToken");
 const jwt = require("jsonwebtoken");
 const Cart = require("../models/cartModel");
 const uniqid = require("uniqid");
+const { default: mongoose } = require("mongoose");
 
 const createUser = async (req, res) => {
   try {
@@ -114,15 +115,11 @@ const logout = async (req, res) => {
 
     if (!user) {
       res.clearCookie("refreshToken", { httpOnly: true, secure: true });
-      return res.status(204).json("User Not Found Cookie Cleared!");
+      return res.status(403).json("User Not Found Cookie Cleared!");
     }
 
-    await User.findOneAndUpdate(
-      { refreshToken },
-      { $set: { refreshToken: "" } }
-    );
     res.clearCookie("refreshToken", { httpOnly: true, secure: true });
-    res.status(200).json("Success");
+    return res.status(200).json("Success");
   } catch (error) {
     console.log(error);
   }
@@ -153,8 +150,9 @@ const updateUser = async (req, res) => {
 };
 
 const userAddress = async (req, res) => {
+  const { id } = req.user;
   try {
-    const { id } = req.user;
+    validId(id, res);
 
     const newAddress = await User.findByIdAndUpdate(
       id,
@@ -183,6 +181,8 @@ const getallUsers = async (req, res) => {
 const singleUser = async (req, res) => {
   const { id } = req.params;
   try {
+    validId(id, res);
+
     const userData = await User.findById(id).populate("cart").exec();
     res.json(userData);
   } catch (error) {
@@ -299,61 +299,40 @@ const adminLogin = async (req, res) => {
     console.log(error);
   }
 };
+
 const userWishlist = async (req, res) => {
   const { id } = req.user;
 
   try {
-    const data = await User.findById(id).populate("wishlist").exec();
-    return res.status(200).json(data);
+    validId(id, res);
+    const user = await User.findById(id)
+      .populate({
+        path: "wishlist",
+        populate: [
+          { path: "categories" },
+          { path: "brand" },
+          { path: "color" },
+          { path: "ratings" },
+        ],
+      })
+      .exec();
+    if (!user) {
+      return res.status(400).json({ error: "User not found" });
+    }
+    return res.status(200).json(user?.wishlist);
   } catch (error) {
-    console.log(error);
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
-// const addtoWishList = async (req, res) => {
-//   const { id } = req.user;
-//   const { prodId } = req.body;
-//   try {
-//     const user = await User.findById(id);
-//     const alreadyAdded = user.wishlist.find((id) => id.toString() === prodId);
-//     console.log(alreadyAdded);
-//     if (alreadyAdded) {
-//       console.log(`Removing ${prodId} from wishlist`);
-//       let updatedUser = await User.findByIdAndUpdate(
-//         id,
-//         {
-//           $pull: { wishlist: prodId },
-//         },
-//         {
-//           new: true,
-//         }
-//       );
-//       console.log("User after removing:", updatedUser);
-//       res.json(updatedUser);
-//     } else {
-//       console.log(`Adding ${prodId} to wishlist`);
-//       let updatedUser = await User.findByIdAndUpdate(
-//         id,
-//         {
-//           $push: { wishlist: prodId },
-//         },
-//         {
-//           new: true,
-//         }
-//       );
-//       console.log("User after adding:", updatedUser);
-//       res.json(updatedUser);
-//     }
-//   } catch (error) {
-//     console.log("Error:", error);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// };
 
 const addtoWishList = async (req, res) => {
   const { id } = req.user;
   const { prodId } = req.body;
-
+  console.log(id, prodId);
   try {
+    validId(id, res);
+
     const user = await User.findById(id);
     const alreadyAddedIndex = user.wishlist.findIndex(
       (itemId) => itemId.toString() === prodId
@@ -364,34 +343,66 @@ const addtoWishList = async (req, res) => {
     }
     user.wishlist.push(prodId);
     const updatedUser = await user.save();
-    res.json(updatedUser);
+    if (updatedUser) {
+      const result = await User.findById(id).populate("wishlist").exec();
+      console.log(result);
+      return res.status(200).json(result);
+    }
   } catch (error) {
     console.log("Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
-//Cart Control
+const removeAProductFromWishlist = async (req, res) => {
+  const { id } = req.user;
+  const { prodId } = req.body;
+  try {
+    validId(id, res);
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      { $pull: { wishlist: prodId } },
+      { new: true }
+    );
+    if (!updatedUser) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    return res.status(200).json(updatedUser);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json("Internal server error");
+  }
+};
+
 const userCart = async (req, res) => {
   const { productId, color, quantity, price } = req.body;
   const { id } = req.user;
   try {
     validId(id, res);
-    let finalCart = await new Cart({
-      userId: id,
-      productId,
-      color,
-      price,
-      quantity,
-    }).save();
-    res.status(200).json(finalCart);
+    const existingCartItem = await Cart.findOne({ userId: id, productId });
 
-    //
-    const pushToUser = await User.findByIdAndUpdate(id, {
-      $push: { cart: finalCart._id },
-    });
+    if (existingCartItem) {
+      existingCartItem.color = color;
+      existingCartItem.quantity = quantity;
+      existingCartItem.price = price;
+      await existingCartItem.save();
+      res.status(200).json(existingCartItem);
+    } else {
+      let finalCart = await new Cart({
+        userId: id,
+        productId,
+        color,
+        price,
+        quantity,
+      }).save();
+      res.status(200).json(finalCart);
+      await User.findByIdAndUpdate(id, {
+        $push: { cart: finalCart._id },
+      });
+    }
   } catch (error) {
     console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -421,6 +432,11 @@ const removeAProductCart = async (req, res) => {
       userId: id,
       productId: req.params?.id,
     });
+    await User.findByIdAndUpdate(
+      id,
+      { $pull: { cart: result._id } },
+      { new: true }
+    );
     return res.status(200).json(result);
   } catch (error) {
     console.log(error);
@@ -431,6 +447,7 @@ const removeAProductCart = async (req, res) => {
 const updateQuantityFromCart = async (req, res) => {
   const { id } = req.user;
   const { prodId, newQuantity } = req.body;
+
   try {
     validId(id, res);
     const userCart = await Cart.findOne({ userId: id, productId: prodId });
@@ -447,14 +464,17 @@ const emptyCart = async (req, res) => {
   try {
     validId(id, res);
     const user = await User.findById(id);
-    const userCart = await Cart.findOneAndDelete({ userId: user._id });
-    res.status(200).json(userCart);
+    if (!user) {
+      return res.status(401).json("User not found");
+    }
+    user.cart = [];
+    await user.save();
+    await Cart.deleteMany({ userId: user._id });
+    return res.status(200).json("Success");
   } catch (error) {
     console.log(error);
   }
 };
-
-//Create Order
 
 const createOrder = async (req, res) => {
   const { id } = req.user;
@@ -490,43 +510,43 @@ const getOrders = async (req, res) => {
   }
 };
 
-// const getAllOrders = async (req, res) => {
-//   try {
-//     const allOrders = await Order.find().populate("products").exec();
-//     res.status(200).json(allOrders);
-//   } catch (error) {
-//     console.log(error);
-//   }
-// };
+const getAllOrders = async (req, res) => {
+  try {
+    const allOrders = await Order.find().populate("products").exec();
+    res.status(200).json(allOrders);
+  } catch (error) {
+    console.log(error);
+  }
+};
 
-// const getOrderByUserId = async (req, res) => {
-//   const { id } = req.params;
-//   try {
-//     validId(id, res);
-//     const userOrders = await Order.findOne({ orderBy: id });
-//     res.status(200).json(userOrders);
-//   } catch (error) {
-//     console.log(error);
-//   }
-// };
+const getAllOrdersOfUserId = async (req, res) => {
+  const { id } = req.params;
+  try {
+    validId(id, res);
+    const userOrders = await Order.findOne({ orderBy: id });
+    res.status(200).json(userOrders);
+  } catch (error) {
+    console.log(error);
+  }
+};
 
-// const updateOrderStatus = async (req, res) => {
-//   const { id } = req.params;
-//   const { status } = req.body;
-//   try {
-//     const updatedOrderStatus = await Order.findByIdAndUpdate(
-//       id,
-//       {
-//         orderStatus: status,
-//       },
+const updateOrderStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    const updatedOrderStatus = await Order.findByIdAndUpdate(
+      id,
+      {
+        orderStatus: status,
+      },
 
-//       { new: true }
-//     );
-//     res.status(200).json(updatedOrderStatus);
-//   } catch (error) {
-//     console.log(error);
-//   }
-// };
+      { new: true }
+    );
+    res.status(200).json(updatedOrderStatus);
+  } catch (error) {
+    console.log(error);
+  }
+};
 
 module.exports = {
   createUser,
@@ -542,6 +562,7 @@ module.exports = {
   refreshTokenhandler,
   userWishlist,
   addtoWishList,
+  removeAProductFromWishlist,
   adminLogin,
   removeAProductCart,
   updateQuantityFromCart,
@@ -550,8 +571,8 @@ module.exports = {
   emptyCart,
   createOrder,
   getOrders,
-  // getAllOrders,
-  // getOrderByUserId,
-  // updateOrderStatus,
+  getAllOrders,
+  getAllOrdersOfUserId,
+  updateOrderStatus,
   logout,
 };

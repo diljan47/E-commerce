@@ -18,7 +18,7 @@ const createColor = async (req, res) => {
 const updateColor = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const updatedColor = await Color.findByIdAndUpdate(id, req.body, {
       new: true,
     });
@@ -30,7 +30,7 @@ const updateColor = async (req, res) => {
 const deleteColor = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     await Color.findByIdAndDelete(id);
     return res.status(200).json("Color Deleted");
   } catch (error) {
@@ -40,7 +40,7 @@ const deleteColor = async (req, res) => {
 const getColor = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const getaColor = await Color.findById(id);
     return res.status(200).json(getaColor);
   } catch (error) {

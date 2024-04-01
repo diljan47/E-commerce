@@ -17,7 +17,7 @@ const createBrand = async (req, res) => {
 const updateBrand = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const updatedBrand = await Brands.findByIdAndUpdate(id, req.body, {
       new: true,
     });
@@ -29,7 +29,7 @@ const updateBrand = async (req, res) => {
 const deleteBrand = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const deletedBrand = await Brands.findByIdAndDelete(id);
     return res.status(200).json(deletedBrand);
   } catch (error) {
@@ -39,7 +39,7 @@ const deleteBrand = async (req, res) => {
 const getBrand = async (req, res) => {
   const { id } = req.params;
   try {
-    validId(id);
+    validId(id, res);
     const getaBrand = await Brands.findById(id);
     return res.status(200).json(getaBrand);
   } catch (error) {

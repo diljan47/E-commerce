@@ -2,6 +2,7 @@ const { default: slugify } = require("slugify");
 const Products = require("../models/productModel");
 const validId = require("../config/mongoIDvalidate");
 const cloudinary = require("../config/cloudinary");
+const mongoose = require("mongoose");
 const fs = require("fs").promises;
 
 const createProduct = async (req, res) => {
@@ -78,52 +79,80 @@ const deleteaProduct = async (req, res) => {
 
 const getaAllProducts = async (req, res) => {
   try {
-    //Filtering using gt,gte,lt,lte on query
-
-    // let query = JSON.stringify(req.query);
-    // query = query.replace(/\b(gt|gte|lt|lte)\b/g, (match) => {
-    //   return `$${match}`;
-    // });
-    // const newQuery = JSON.parse(query);
-    // let result = Products.find(newQuery);
-    //
     const queryObj = { ...req.query };
     const excludeFields = ["page", "sort", "limit", "fields"];
     excludeFields.forEach((el) => delete queryObj[el]);
-    let queryStr = JSON.stringify(queryObj);
-    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+    console.log(queryObj);
 
-    let result = Products.find(JSON.parse(queryStr));
-    //Sorting
+    if (queryObj.gender) {
+      queryObj.gender = queryObj.gender.split(",");
+    }
+
+    if (queryObj.categories) {
+      queryObj.categories = queryObj.categories.split(",");
+    }
+
+    if (queryObj.brand) {
+      queryObj.brand = queryObj.brand.split(",");
+    }
+    if (queryObj.color) {
+      queryObj.color = queryObj.color.split(",");
+    }
+
+    let query = Products.find();
+
+    if (queryObj.gender) {
+      query = query.where("gender").in(queryObj.gender);
+    }
+
+    if (queryObj.categories) {
+      query = query.where("categories").in(queryObj.categories);
+    }
+
+    if (queryObj.brand) {
+      query = query.where("brand").in(queryObj.brand);
+    }
+    if (queryObj.color) {
+      query = query.where("color").in(queryObj.color);
+    }
+    if (queryObj.minrating) {
+      const ratingResult = parseFloat(queryObj.minrating);
+      console.log(ratingResult);
+      query = query.where("totalrating").gte(ratingResult);
+    }
+    // Sorting
     if (req.query.sort) {
       const sortQuery = req.query.sort.split(",").join(" ");
-      result = result.sort(sortQuery);
+      query = query.sort(sortQuery);
     } else {
-      result = result.sort("-createdAt");
+      query = query.sort("-createdAt");
+    }
+    if (req.query.priceRange) {
+      const [minPrice, maxPrice] = req.query.priceRange.split(",");
+      query = query.where("price").gte(minPrice).lte(maxPrice);
     }
 
-    // field limit
+    // Field limit
     const fieldsArray = (req.query.fields || "").split(",");
     const selectedFields = fieldsArray.join(" ");
-    result = result.select(selectedFields || "-__v");
+    query = query.select(selectedFields || "-__v");
 
-    //Pagination
-    const page = req.query.page;
-    const limit = req.query.limit;
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    result = result.skip(skip).limit(limit);
-    if (req.query.page) {
-      const productCount = await Products.countDocuments();
-      if (skip >= productCount) {
-        return res.status(204).json("This Page does not exists");
-      }
-    }
-    const findAllProducts = await result.populate("categories").exec();
-    return res
-      .status(200)
-      .json({ length: findAllProducts.length, data: findAllProducts });
+    query = query.skip(skip).limit(limit);
+
+    const findAllProducts = await query
+      .populate("categories")
+      .populate("color")
+      .populate("brand")
+      .exec();
+
+    return res.status(200).json(findAllProducts);
   } catch (error) {
     console.log(error);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -189,6 +218,8 @@ const ratings = async (req, res) => {
   const { id } = req.user;
   const { prodId, star, comment } = req.body;
   try {
+    validId(id, res);
+
     const productDetails = await Products.findById(prodId);
 
     const alreadyRated = productDetails.ratings.find(

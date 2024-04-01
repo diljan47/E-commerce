@@ -13,7 +13,7 @@ const jwtAuth = require("../middleware/jwtauth");
 const upload = require("../middleware/upload");
 
 router.post("/create", jwtAuth, upload.array("images", 10), createProduct);
-router.put("/update/:id", jwtAuth, isAdmin, updateProduct);
+router.put("/update/:id", updateProduct);
 router.get("/:id", getaProduct);
 router.get("/", getaAllProducts);
 router.put("/ratings", jwtAuth, ratings);

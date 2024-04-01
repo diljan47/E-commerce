@@ -19,7 +19,6 @@ const {
   createOrder,
   getOrders,
   getAllOrders,
-  getOrderByUserId,
   updateOrderStatus,
   logout,
   removeAProductCart,
@@ -27,6 +26,8 @@ const {
   addtoWishList,
   createForgotPassToken,
   resetPasswordFromMail,
+  removeAProductFromWishlist,
+  getAllOrdersOfUserId,
 } = require("../controller/userControl");
 const isAdmin = require("../middleware/isAdmin");
 const jwtAuth = require("../middleware/jwtauth");
@@ -44,16 +45,17 @@ router.get("/", jwtAuth, getUserCart);
 router.get("/orders", jwtAuth, getOrders);
 router.get("/wishlist", jwtAuth, userWishlist);
 router.put("/add-to-wishlist", jwtAuth, addtoWishList);
+router.post("/remove-wishlist", jwtAuth, removeAProductFromWishlist);
 router.post("/order/checkout", jwtAuth, checkOut);
 router.post("/order/success", jwtAuth, verifyPayment);
 router.post("/logout", logout);
-//
-// router.get("/all-orders", jwtAuth, isAdmin, getAllOrders);
-// router.post("/all-orders/:id", jwtAuth, isAdmin, getOrderByUserId);
+
+router.get("/all-orders", jwtAuth, isAdmin, getAllOrders);
+router.post("/all-orders/:id", jwtAuth, isAdmin, getAllOrdersOfUserId);
 //
 router.get("/:id", jwtAuth, singleUser);
 router.put("/user-edit", jwtAuth, updateUser);
-// router.put("/order-status/:id", jwtAuth, isAdmin, updateOrderStatus);
+router.put("/order-status/:id", jwtAuth, isAdmin, updateOrderStatus);
 router.put("/user-address", jwtAuth, userAddress);
 router.put("/update-password", jwtAuth, updatePassword);
 router.put("/update-usercart/", jwtAuth, updateQuantityFromCart);

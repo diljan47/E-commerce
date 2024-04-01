@@ -51,7 +51,6 @@ const userModel = new mongoose.Schema(
       expirationTime: {
         type: Date,
         default: Date.now,
-        expires: 3600,
       },
     },
   },
@@ -81,13 +80,19 @@ userModel.methods.createPassResetToken = async function () {
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
-  const expirationTime = new Date(Date.now() + 3600 * 1000);
+  const expirationTime = new Date(Date.now() + 10 * 60 * 1000);
   this.passwordResetToken = {
     token: cryptoToken,
     expirationTime: expirationTime,
   };
   await this.save();
+
   return cryptoToken;
 };
+// TTL index to automatically delete documents after expirationTime
+userModel.index(
+  { "passwordResetToken.expirationTime": 1 },
+  { expireAfterSeconds: 0 }
+);
 
 module.exports = mongoose.model("User", userModel);

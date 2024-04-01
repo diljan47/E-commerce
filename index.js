@@ -18,6 +18,8 @@ app.use(morgan("dev"));
 const dbConnect = () => {
   try {
     mongoose.connect(process.env.MONGODB_URL);
+    // mongoose.set("debug", true);
+
     console.log("Database Connected ");
   } catch (error) {
     console.log("Database Error");
