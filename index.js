@@ -15,9 +15,9 @@ const bodyParser = require("body-parser");
 const morgan = require("morgan");
 app.use(morgan("dev"));
 
-const dbConnect = () => {
+const dbConnect = async () => {
   try {
-    mongoose.connect(process.env.MONGODB_URL);
+    await mongoose.connect(process.env.MONGODB_URL);
     // mongoose.set("debug", true);
 
     console.log("Database Connected ");
@@ -30,10 +30,7 @@ const corsOptions = {
   origin: [process.env.BASE_URL],
   credentials: true,
 };
-dbConnect();
 app.use(cookieParser());
-// app.use(cors());
-
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
@@ -44,6 +41,8 @@ app.use("/api/category", categoryRoute);
 app.use("/api/color", colorRoute);
 app.use("/api/brand", brandRoute);
 
-app.listen(PORT, () => {
-  console.log(`Server started on PORT ${PORT}`);
+dbConnect().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server started on PORT ${PORT}`);
+  });
 });
