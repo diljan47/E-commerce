@@ -27,6 +27,7 @@ const dbConnect = async () => {
 };
 
 const allowedOrigins = [process.env.BASE_URL, process.env.REACT_APP_BASE_URL];
+console.log(allowedOrigins);
 
 const corsOptions = {
   origin: allowedOrigins,
