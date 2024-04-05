@@ -30,7 +30,7 @@ const allowedOrigins = [process.env.BASE_URL, process.env.REACT_APP_BASE_URL];
 console.log(allowedOrigins);
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: process.env.REACT_APP_BASE_URL,
   credentials: true,
 };
 app.use(cookieParser());
